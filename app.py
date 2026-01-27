@@ -754,13 +754,214 @@ class OpenAINativeToolCaller:
     st.markdown(f"The output clearly shows the LLM's thought process. For each query requiring a tool, the LLM first generates a `tool_calls` message with the function name and arguments. Our `OpenAINativeToolCaller` then intercepts this, executes the mocked Python function, and feeds the `tool_response` back to the LLM. Finally, the LLM generates a coherent, context-aware response incorporating the tool's output. For OrgAIR, this means LLMs can now perform complex analyses by integrating directly with our proprietary data and computation engines, moving beyond simple text generation to true intelligent automation.")
     st.markdown(f"")
 
-    st.subheader("Native Tool Calling vs. Instructor Abstraction:")
-    st.markdown(f"")
-    st.markdown(f"While this notebook focuses on native tool calling (using the LLM provider's built-in function calling mechanism), it's important to understand alternatives like `Instructor`.")
-    st.markdown(f"*   **Native Tool Calling (as demonstrated):** Directly uses the LLM provider's API for function calls. The LLM decides when and how to call tools. You handle parsing the tool call and executing your Python function. This gives you maximum flexibility and is often the most direct way to leverage the latest LLM capabilities.")
-    st.markdown(f"*   **Instructor Abstraction:** Libraries like `Instructor` (or `Pydantic-ChatCompletion` for older models) wrap the LLM calls to force structured outputs, often using Pydantic models. Instead of the LLM deciding to *call* a tool, you might prompt the LLM to *generate* a Pydantic object representing the output of a hypothetical tool. This is excellent for ensuring type-safe JSON outputs and can simplify certain structured extraction tasks where you want the LLM to directly emit data in a specific format, rather than orchestrating a multi-turn tool interaction.")
-    st.markdown(f"For OrgAIR's workflow, native tool calling is preferred when the LLM needs to make decisions about *when* to use a tool and *what arguments* to pass based on conversational context. Instructor would be valuable for directly extracting structured data (e.g., all financial metrics) into Pydantic models in a single turn.")
-    st.markdown(f"")
+    st.subheader(
+        "Native Tool Calling vs. Structured Output (Pydantic / Instructor)")
+    st.markdown("")
+
+    col_native, col_struct = st.columns(2, gap="large")
+
+    with col_native:
+        st.markdown(
+            "### ✅ Native LLM Tool Calling (provider-native functions/tools)")
+        st.markdown(
+            """
+    Use this when the model should **decide if/when to call tools**, pick the **right tool**, and fill **arguments**
+    based on conversation context. This is ideal for **multi-step retrieval + computation** (OrgAIR calculator,
+    evidence DB, projections).
+
+    **Works great for:** `openai/gpt-4o` and (via LiteLLM) `anthropic/claude-sonnet-3.5`, `anthropic/claude-haiku`.
+    """
+        )
+
+        st.markdown(
+            "**Example A — your existing OpenAI-native loop (already in `source.py`)**")
+        st.code(
+            """# Uses Pydantic tool schemas + OpenAI native tool calling loop
+    messages = [{"role": "user", "content": "What is the Org-AI-R score for InnovateCorp?"}]
+    result = await openai_tool_caller.chat_with_tools(messages=messages, model="gpt-4o")
+    print(result["response"])
+    print(result["tool_calls"])""",
+            language="python",
+        )
+
+        st.markdown(
+            "**Example B — provider-agnostic tool calling via LiteLLM (OpenAI + Anthropic models)**")
+        st.code(
+            """from litellm import acompletion
+    import json
+
+    # 1) Build tool schema once (same idea as your _get_tools_schema())
+    tools_schema = [
+    {
+        "type": "function",
+        "function": {
+        "name": tool.name,
+        "description": tool.description,
+        "parameters": tool.input_schema.model_json_schema(),
+        },
+    }
+    for tool in TOOLS.values()
+    ]
+
+    async def litellm_native_tool_call(model: str, user_query: str):
+        conversation = [{"role": "user", "content": user_query}]
+
+        # First call: let model decide tool usage
+        resp = await acompletion(
+            model=model,                       # e.g. "openai/gpt-4o" or "anthropic/claude-sonnet-3.5"
+            messages=conversation,
+            tools=tools_schema,
+            tool_choice="auto",
+        )
+
+        msg = resp.choices[0].message
+
+        # If no tool calls, we’re done
+        if not getattr(msg, "tool_calls", None):
+            return {"response": msg.content, "tool_calls": []}
+
+        # Execute tool calls
+        tool_results = []
+        for tc in msg.tool_calls:
+            tool_name = tc.function.name
+            args = json.loads(tc.function.arguments)
+            result = await TOOLS[tool_name].handler(**args)
+            tool_results.append({"tool": tool_name, "result": result})
+
+            # Feed tool result back
+            conversation.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result),
+            })
+
+        # Final call: ask for final response (no more tools)
+        final = await acompletion(
+            model=model,
+            messages=conversation,
+            tool_choice="none",
+        )
+
+        return {"response": final.choices[0].message.content, "tool_calls": tool_results}
+
+    # Try with your routed models:
+    # await litellm_native_tool_call("openai/gpt-4o", "Project EBITDA impact if score reaches 85 in 3 years.")
+    # await litellm_native_tool_call("anthropic/claude-sonnet-3.5", "Get evidence for risk factors for InnovateCorp.")
+    # await litellm_native_tool_call("anthropic/claude-haiku", "What is the Org-AI-R score for InnovateCorp?")""",
+            language="python",
+        )
+
+    with col_struct:
+        st.markdown("### 🧱 Structured Output (Pydantic / Instructor)")
+        st.markdown(
+            """
+    Use this when you want the model to return a **type-safe JSON object** that matches a schema
+    (e.g., extraction, classification, a tool *plan*, or a compact result object).  
+    This is often **single-turn**, predictable, and great for **validation + downstream automation**.
+
+    **Key distinction:** structured output does **not** automatically execute tools; it makes the model emit **structured data**.
+    """
+        )
+
+        st.markdown(
+            "**Example A — OpenAI structured JSON → Pydantic parse (no Instructor)**")
+        st.code(
+            """import json
+    from pydantic import BaseModel, Field
+    import openai
+
+    class OrgAIRScoreAnswer(BaseModel):
+        company_id: str = Field(...)
+        org_air_score: float = Field(...)
+        sector_benchmark: float = Field(...)
+        confidence_score: float | None = None
+
+    client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    async def structured_orgair_answer_openai(user_query: str):
+        resp = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Return ONLY valid JSON matching the schema."},
+                {"role": "user", "content": user_query},
+            ],
+            # If your environment supports it, this is even better:
+            # response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+
+        data = json.loads(resp.choices[0].message.content)
+        return OrgAIRScoreAnswer.model_validate(data)
+
+    # result = await structured_orgair_answer_openai("Return InnovateCorp OrgAIR score as JSON.")""",
+            language="python",
+        )
+
+        st.markdown(
+            "**Example B — Instructor (Pydantic-native) for OpenAI or Anthropic**")
+        st.code(
+            """import instructor
+    from pydantic import BaseModel, Field
+    import openai
+    from anthropic import Anthropic
+
+    class EvidenceRequest(BaseModel):
+        company_id: str = Field(...)
+        dimension: str = Field(...)
+        limit: int = Field(10)
+
+    # --- OpenAI Instructor client ---
+    oai = instructor.from_openai(openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY))
+
+    async def make_evidence_request_openai(user_query: str) -> EvidenceRequest:
+        return await oai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": user_query}],
+            response_model=EvidenceRequest,
+            temperature=0,
+        )
+
+    # --- Anthropic Instructor client (if you’re using Anthropic directly) ---
+    anth = instructor.from_anthropic(Anthropic(api_key=settings.ANTHROPIC_API_KEY))
+
+    def make_evidence_request_anthropic(user_query: str) -> EvidenceRequest:
+        return anth.messages.create(
+            model="claude-3-5-sonnet-latest",  # map to your Anthropic model as needed
+            messages=[{"role": "user", "content": user_query}],
+            response_model=EvidenceRequest,
+            temperature=0,
+        )
+
+    # Then you execute your tool yourself:
+    # req = await make_evidence_request_openai("Make an evidence request for InnovateCorp risk factors.")
+    # evidence = await TOOLS["get_company_evidence"].handler(**req.model_dump())""",
+            language="python",
+        )
+
+        st.markdown("**Pattern: “Structured Tool Plan” (best of both worlds)**")
+        st.markdown(
+            """
+    If you *don’t* want native tool calling, you can still do multi-step workflows by asking the model to output a
+    Pydantic **ToolPlan**, then you execute tools deterministically.
+    """
+        )
+
+        st.code(
+            """from pydantic import BaseModel, Field
+    from typing import Literal
+
+    class ToolPlan(BaseModel):
+        tool: Literal["calculate_org_air_score", "get_company_evidence", "project_ebitda_impact"]
+        args: dict = Field(default_factory=dict)
+
+    # LLM returns ToolPlan (via Instructor or JSON mode) -> you run:
+    # plan = ...
+    # result = await TOOLS[plan.tool].handler(**plan.args)""",
+            language="python",
+        )
+
+    st.markdown("")
 
 
 elif st.session_state.current_page == "5. Cost Management & Budget Enforcement":

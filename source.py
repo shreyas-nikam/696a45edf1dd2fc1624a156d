@@ -695,7 +695,7 @@ async def attempt_llm_request(task_type: TaskType, prompt: str, expected_cost_pe
         return False
 
 # Set a very low budget to quickly demonstrate enforcement
-model_router.daily_budget.limit_usd = Decimal("0.002")  # e.g., 0.2 cents
+model_router.daily_budget.limit_usd = Decimal("1.000")  # e.g., 0.2 cents
 print(
     f"Adjusted Daily Budget Limit for demo: ${model_router.daily_budget.limit_usd}")
 

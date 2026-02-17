@@ -82,13 +82,13 @@ class ModelConfig:
 MODEL_ROUTING: Dict[TaskType, ModelConfig] = {
     TaskType.EVIDENCE_EXTRACTION: ModelConfig(
         primary="openai/gpt-4o",  # High accuracy for complex extraction
-        fallbacks=["anthropic/claude-sonnet-3.5", "openai/gpt-4-turbo"],
+        fallbacks=["anthropic/claude-sonnet-4-6", "openai/gpt-4-turbo"],
         temperature=0.3,
         max_tokens=4000,
         cost_per_1k_tokens=Decimal("0.015"),
     ),
     TaskType.DIMENSION_SCORING: ModelConfig(
-        primary="anthropic/claude-sonnet-3.5",  # Good balance of cost and performance
+        primary="anthropic/claude-sonnet-4-6",  # Good balance of cost and performance
         fallbacks=["openai/gpt-4o", "openai/gpt-3.5-turbo"],
         temperature=0.2,
         max_tokens=2000,
@@ -96,20 +96,20 @@ MODEL_ROUTING: Dict[TaskType, ModelConfig] = {
     ),
     TaskType.RISK_ANALYSIS: ModelConfig(
         primary="openai/gpt-4o",
-        fallbacks=["anthropic/claude-sonnet-3.5"],
+        fallbacks=["anthropic/claude-sonnet-4-6"],
         temperature=0.4,
         max_tokens=3000,
         cost_per_1k_tokens=Decimal("0.015"),
     ),
     TaskType.PATHWAY_GENERATION: ModelConfig(
         primary="openai/gpt-4o",  # Strategic planning needs high quality
-        fallbacks=["anthropic/claude-sonnet-3.5", "openai/gpt-4-turbo"],
+        fallbacks=["anthropic/claude-sonnet-4-6", "openai/gpt-4-turbo"],
         temperature=0.5,
         max_tokens=3500,
         cost_per_1k_tokens=Decimal("0.015"),
     ),
     TaskType.CHAT_RESPONSE: ModelConfig(
-        primary="anthropic/claude-haiku",  # Cheaper, faster for chat
+        primary="anthropic/claude-haiku-4-5",  # Cheaper, faster for chat
         fallbacks=["openai/gpt-3.5-turbo"],
         temperature=0.7,
         max_tokens=1000,
@@ -330,13 +330,13 @@ async def run_extraction_scenario(task_type: TaskType, prompt: str):
 # # simulate_failure_mode("gpt-4o", enabled=False) # Restore key
 
 # # Simulate all models failing for a specific task (e.g., Anthropic key issues)
-# # simulate_failure_mode("claude-sonnet-3.5", enabled=True)
+# # simulate_failure_mode("claude-sonnet-4-6", enabled=True)
 # # simulate_failure_mode("gpt-4o", enabled=True) # Also simulate OpenAI failure to trigger full fallback failure
 # await run_extraction_scenario(
 #     TaskType.DIMENSION_SCORING,
 #     f"Analyze the document and score its 'innovation potential' on a scale of 1-100: {synthetic_enterprise_document_text}"
 # )
-# simulate_failure_mode("claude-sonnet-3.5", enabled=False) # Restore keys
+# simulate_failure_mode("claude-sonnet-4-6", enabled=False) # Restore keys
 # simulate_failure_mode("gpt-4o", enabled=False)
 
 # Scenario for exceeding budget

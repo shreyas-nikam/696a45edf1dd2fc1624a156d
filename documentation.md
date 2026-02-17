@@ -161,7 +161,7 @@ The `MODEL_ROUTING` dictionary in `source.py` defines which models to use for ea
 MODEL_ROUTING: dict[TaskType, ModelConfig] = {
     TaskType.EVIDENCE_EXTRACTION: ModelConfig(
         primary_model="gpt-4o",
-        fallback_models=["claude-sonnet-3.5", "gpt-3.5-turbo-0125"],
+        fallback_models=["claude-sonnet-4-6", "gpt-3.5-turbo-0125"],
     ),
     # ... other TaskTypes
 }
@@ -192,7 +192,7 @@ if st.button("Run LLM Completion"):
 **Observation:**
 When you simulate a failure for the primary model, the `ModelRouter` will attempt to use the fallback model. You will see this reflected in the raw logs, showing `llm_fallback` warnings and successful requests to the fallback model. If all configured models fail, a `RuntimeError` is raised.
 
-The logs demonstrate how `ModelRouter` attempts to use the primary model (e.g., `gpt-4o` for `EVIDENCE_EXTRACTION`). When we artificially introduce an invalid API key, `litellm` fails to connect, and the system gracefully falls back to `claude-sonnet-3.5`, as observed by the `llm_fallback` warning and the subsequent `llm_request` for the fallback model. If all models configured for a specific `TaskType` fail, a `RuntimeError` is raised, preventing an indefinite loop.
+The logs demonstrate how `ModelRouter` attempts to use the primary model (e.g., `gpt-4o` for `EVIDENCE_EXTRACTION`). When we artificially introduce an invalid API key, `litellm` fails to connect, and the system gracefully falls back to `claude-sonnet-4-6`, as observed by the `llm_fallback` warning and the subsequent `llm_request` for the fallback model. If all models configured for a specific `TaskType` fail, a `RuntimeError` is raised, preventing an indefinite loop.
 
 ### Cost Tracking Integration
 

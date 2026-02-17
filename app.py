@@ -311,7 +311,7 @@ model_list:
       input_cost_per_token: 0.000001 # Cheaper model
       output_cost_per_token: 0.000002
     litellm_params:
-      model: claude/claude-3-haiku
+      model: claude/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 router_settings:
   routing_strategy: "lowest-cost" # Routes to cheapest model
@@ -329,8 +329,8 @@ model_list = [
         "litellm_params": {"model": "gpt-4o", "api_key": os.environ["OPENAI_API_KEY"]}
     },
     {
-        "model_name": "claude-3",
-        "litellm_params": {"model": "claude-3-5-sonnet-20240620", "api_key": os.environ["ANTHROPIC_API_KEY"]}
+        "model_name": "claude-sonnet-4-6",
+        "litellm_params": {"model": "claude-sonnet-4-6", "api_key": os.environ["ANTHROPIC_API_KEY"]}
     }
 ]
 
@@ -389,10 +389,10 @@ print(response)
         st.rerun()
 
     if simulate_anthropic_failure:
-        simulate_failure_mode("claude-sonnet-3.5",
+        simulate_failure_mode("claude-sonnet-4-6",
                               enabled=simulate_anthropic_failure)
     else:
-        simulate_failure_mode("claude-sonnet-3.5", enabled=False)
+        simulate_failure_mode("claude-sonnet-4-6", enabled=False)
 
     async def process_llm_request(task_enum, prompt):
         messages = [{"role": "user", "content": prompt}]
@@ -427,7 +427,7 @@ print(response)
             st.markdown(
                 f"Current Cumulative Spend: ${st.session_state.model_router_instance.daily_budget.spent_usd:.4f}")
 
-    st.markdown(f"The logs show how `ModelRouter` attempts to use the primary model (e.g., `gpt-4o` for `EVIDENCE_EXTRACTION`). When we artificially introduce an invalid API key, `litellm` fails to connect, and the system gracefully falls back to `claude-sonnet-3.5`, as observed by the `llm_fallback` warning and the subsequent `llm_request` for the fallback model. If all models configured for a specific `TaskType` fail, a `RuntimeError` is raised, preventing an indefinite loop.")
+    st.markdown(f"The logs show how `ModelRouter` attempts to use the primary model (e.g., `gpt-4o` for `EVIDENCE_EXTRACTION`). When we artificially introduce an invalid API key, `litellm` fails to connect, and the system gracefully falls back to `claude-sonnet-4-6`, as observed by the `llm_fallback` warning and the subsequent `llm_request` for the fallback model. If all models configured for a specific `TaskType` fail, a `RuntimeError` is raised, preventing an indefinite loop.")
     st.markdown(f"")
     with st.expander("Show Raw Logs"):
         st.code("\n".join(st.session_state.captured_logs), language="text")
@@ -801,7 +801,7 @@ class OpenAINativeToolCaller:
     based on conversation context. This is ideal for **multi-step retrieval + computation** (OrgAIR calculator,
     evidence DB, projections).
 
-    **Works great for:** `openai/gpt-4o` and (via LiteLLM) `anthropic/claude-sonnet-3.5`, `anthropic/claude-haiku`.
+    **Works great for:** `openai/gpt-4o` and (via LiteLLM) `anthropic/claude-sonnet-4-6`, `anthropic/claude-haiku-4-5`.
     """
         )
 
@@ -840,7 +840,7 @@ class OpenAINativeToolCaller:
 
         # First call: let model decide tool usage
         resp = await acompletion(
-            model=model,                       # e.g. "openai/gpt-4o" or "anthropic/claude-sonnet-3.5"
+            model=model,                       # e.g. "openai/gpt-4o" or "anthropic/claude-sonnet-4-6"
             messages=conversation,
             tools=tools_schema,
             tool_choice="auto",
@@ -878,8 +878,8 @@ class OpenAINativeToolCaller:
 
     # Try with your routed models:
     # await litellm_native_tool_call("openai/gpt-4o", "Project EBITDA impact if score reaches 85 in 3 years.")
-    # await litellm_native_tool_call("anthropic/claude-sonnet-3.5", "Get evidence for risk factors for InnovateCorp.")
-    # await litellm_native_tool_call("anthropic/claude-haiku", "What is the Org-AI-R score for InnovateCorp?")""",
+    # await litellm_native_tool_call("anthropic/claude-sonnet-4-6", "Get evidence for risk factors for InnovateCorp.")
+    # await litellm_native_tool_call("anthropic/claude-haiku-4-5", "What is the Org-AI-R score for InnovateCorp?")""",
             language="python",
         )
 
@@ -959,7 +959,7 @@ class OpenAINativeToolCaller:
 
     def make_evidence_request_anthropic(user_query: str) -> EvidenceRequest:
         return anth.messages.create(
-            model="claude-3-5-sonnet-latest",  # map to your Anthropic model as needed
+            model="claude-sonnet-4-6",  # map to your Anthropic model as needed
             messages=[{"role": "user", "content": user_query}],
             response_model=EvidenceRequest,
             temperature=0,
